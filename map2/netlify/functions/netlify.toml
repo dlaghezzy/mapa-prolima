@@ -1,4 +1,0 @@
-[build]
-  base = "map2"
-  publish = "."
-  functions = "netlify/functions"
