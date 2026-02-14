@@ -1,0 +1,2161 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Mapa Prolima (Híbrido: Ficha Modal por URL)</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/prolima.png">
+  <link rel="apple-touch-icon" href="/prolima.png">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <style>
+    :root{
+      --bg:#f8fafc; --card:#ffffff; --bd:#e5e7eb; --text:#0f172a; --muted:#64748b;
+      --shadow:0 10px 30px rgba(2,6,23,.10);
+      --r:16px; --touch:44px;
+      --topbarH: 64px;
+      --panelW: 980px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
+    button,select,input,textarea{font:inherit}
+
+    #topbar{
+      position:sticky; top:0; z-index:3000;
+      background:rgba(255,255,255,.92); backdrop-filter:blur(10px);
+      border-bottom:1px solid var(--bd);
+      padding:10px 12px;
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .brand{display:flex; gap:10px; align-items:center}
+    .brand strong{font-size:16px}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;border:1px solid var(--bd);background:#fff}
+
+    .ctrl{height:var(--touch);padding:0 12px;border:1px solid var(--bd);border-radius:12px;background:#fff;min-width:180px}
+    .btn{
+      height:var(--touch); padding:0 12px;
+      border:1px solid var(--bd); border-radius:12px;
+      background:#fff; cursor:pointer;
+      font-weight:800;
+    }
+    .btn.primary{background:#0f172a;color:#fff;border-color:#0f172a}
+    .btn.soft{background:#f1f5f9}
+    .btn.warn{background:#fff7ed;border-color:#fed7aa}
+    .btn.active{background:#0f172a;color:#fff;border-color:#0f172a}
+    #toggleSide{min-width:var(--touch); padding:0 10px}
+
+    /* Multi-select años */
+    .multi{
+      position:relative;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-height:var(--touch);
+      padding:6px 10px;
+      border:1px solid var(--bd);
+      border-radius:12px;
+      background:#fff;
+      min-width:260px;
+    }
+    .multiChips{
+      display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+      flex:1; min-width:120px;
+    }
+    .chipBtn{
+      height:28px; padding:0 10px;
+      border-radius:999px;
+      border:1px solid var(--bd);
+      background:#fff;
+      cursor:pointer;
+      font-size:12px;
+      font-weight:900;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+    }
+    .chipBtn.active{background:#0f172a;color:#fff;border-color:#0f172a}
+    .chipBtn .x{font-weight:900;opacity:.85}
+    .multiActions{display:flex;gap:6px}
+    .mini{
+      height:28px; padding:0 10px;
+      border-radius:10px; border:1px solid var(--bd);
+      background:#f1f5f9; cursor:pointer;
+      font-size:12px; font-weight:900;
+    }
+
+    /* checks topbar */
+    .chk{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 10px;
+      border:1px solid var(--bd);
+      border-radius:12px;
+      background:#fff;
+      height:var(--touch);
+      user-select:none;
+      font-weight:900;
+      font-size:12px;
+    }
+    .dot{
+      width:12px;height:12px;border-radius:3px;border:1px solid var(--bd);
+      display:inline-block;
+    }
+
+    /* Layout */
+    #wrap{
+      display:grid;
+      grid-template-columns:360px 1fr;
+      min-height:calc(100vh - var(--topbarH));
+    }
+    #side{
+      border-right:1px solid var(--bd);
+      padding:12px;
+      background:linear-gradient(#fff, #fbfdff);
+      overflow:auto;
+    }
+    #map{min-height:calc(100vh - var(--topbarH))}
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--bd);
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+      padding:12px;
+      margin-bottom:12px;
+    }
+    .card h3{margin:0 0 8px;font-size:14px}
+    .muted{color:var(--muted);font-size:12px}
+
+    .list{
+      display:flex; flex-direction:column; gap:8px;
+      max-height: calc(100vh - 270px);
+      overflow:auto;
+      padding-right:4px;
+    }
+    .item{
+      padding:10px;
+      border:1px solid var(--bd);
+      border-radius:14px;
+      background:#fff;
+      cursor:pointer;
+    }
+    .item .t{font-weight:900;font-size:13px;line-height:1.2}
+    .item .s{font-size:12px;color:var(--muted);margin-top:4px}
+    .pill{
+      display:inline-flex;align-items:center;
+      padding:2px 8px;border-radius:999px;border:1px solid var(--bd);font-size:12px;
+      margin-top:6px;background:#fff;
+    }
+
+    /* Tabs inside ficha */
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .tab{
+      height:38px; padding:0 12px;
+      border-radius:12px;border:1px solid var(--bd);
+      background:#fff; cursor:pointer; font-weight:900; font-size:12px;
+    }
+    .tab.active{background:#0f172a;color:#fff;border-color:#0f172a}
+
+    /* Subtabs (Acciones) */
+    .subtabs{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .subtab{
+      height:36px; padding:0 12px;
+      border-radius:999px;border:1px solid var(--bd);
+      background:#fff; cursor:pointer; font-weight:900; font-size:12px;
+    }
+    .subtab.active{background:#0f172a;color:#fff;border-color:#0f172a}
+
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .imgcard{border:1px solid var(--bd);border-radius:14px;overflow:hidden;background:#fff}
+    .imgwrap{width:100%;height:170px;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
+    .imgwrap img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer}
+    .imgfoot{padding:8px 10px;font-size:12px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+    .imgfoot a{color:#2563eb;text-decoration:none;font-weight:900}
+    .imgfoot a:hover{text-decoration:underline}
+
+    .textarea{
+      width:100%;
+      min-height:120px;
+      border:1px solid var(--bd);
+      border-radius:14px;
+      padding:10px 12px;
+      outline:none;
+      resize:vertical;
+      background:#fff;
+    }
+    .rowActions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+
+    .kv{
+      margin-top:10px;
+      border:1px solid var(--bd);
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .kvRow{display:flex;gap:10px;padding:8px 10px;border-bottom:1px solid #f1f5f9;align-items:flex-start}
+    .kvRow:last-child{border-bottom:none}
+    .kvK{width:42%;font-size:12px;color:#0f172a;font-weight:900}
+    .kvV{width:58%;font-size:12px;color:#334155;word-break:break-word}
+    .kvV a{color:#2563eb;text-decoration:none;font-weight:900}
+    .kvV a:hover{text-decoration:underline}
+
+    .chip{
+      display:inline-flex;align-items:center;
+      padding:3px 9px;border-radius:999px;border:1px solid var(--bd);
+      font-size:12px;background:#fff;font-weight:900
+    }
+    #fichaModal .panelHead .chip{
+      background:#fff;
+      color:#0f172a !important;
+      border-color:rgba(255,255,255,.35);
+    }
+    #fichaModal .panelHead .chip *{
+      color:#0f172a !important;
+    }
+
+    /* Lightbox */
+    #lightbox{
+      position:fixed; inset:0; z-index:6000;
+      background:rgba(2,6,23,.72);
+      display:none;
+      align-items:center; justify-content:center;
+      padding:18px;
+    }
+    #lightbox .box{
+      width:min(1100px, 96vw);
+      background:#0b1220;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:18px;
+      box-shadow:0 20px 60px rgba(0,0,0,.45);
+      overflow:hidden;
+    }
+    #lightbox .top{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 12px;
+      color:#e2e8f0;
+      background:rgba(255,255,255,.06);
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    #lightbox .top .ttl{font-weight:900;font-size:13px}
+    #lightbox .top .actions{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    #lightbox .top a{
+      color:#93c5fd; text-decoration:none; font-size:12px;
+      padding:6px 10px; border:1px solid rgba(255,255,255,.14); border-radius:12px;
+      font-weight:900;
+    }
+    #lightbox .top button{
+      height:36px; padding:0 12px; border-radius:12px; cursor:pointer;
+      border:1px solid rgba(255,255,255,.16); background:transparent; color:#e2e8f0;
+      font-weight:900;
+    }
+    #lightbox .stage{
+      position:relative;
+      height:min(80vh, 820px);
+      background:#0b1220;
+      overflow:hidden;
+      touch-action:none;
+    }
+    #lightbox img{
+      position:absolute;
+      left:50%; top:50%;
+      transform:translate(-50%,-50%) scale(1);
+      transform-origin:center center;
+      max-width:none;
+      width:auto;
+      height:auto;
+      user-select:none;
+      -webkit-user-drag:none;
+      display:block;
+    }
+    .lbHint{
+      font-size:12px;
+      opacity:.85;
+      color:#cbd5e1;
+      margin-left:6px;
+    }
+
+    /* Left drawer (mobile) */
+    #backdrop{
+      position:fixed; inset:0;
+      background:rgba(2,6,23,.45);
+      display:none;
+      z-index:3500;
+    }
+    body.drawer-open #backdrop{display:block}
+
+    body.drawer-mode #side{
+      position:fixed;
+      top:calc(var(--topbarH) + 0px);
+      left:0;
+      width:min(380px, 88vw);
+      height:calc(100vh - var(--topbarH));
+      z-index:3600;
+      border-right:1px solid var(--bd);
+      box-shadow:0 20px 60px rgba(0,0,0,.25);
+      transform:translateX(-110%);
+      transition:transform .18s ease;
+      background:linear-gradient(#fff, #fbfdff);
+    }
+    body.drawer-mode.drawer-open #side{transform:translateX(0)}
+    body.drawer-mode #wrap{grid-template-columns: 1fr}
+    body.drawer-mode #map{min-height: calc(100vh - var(--topbarH))}
+
+    /* ===== FICHA MODAL ===== */
+    #fichaModal{
+      position:fixed; inset:0;
+      z-index:5000;
+      display:none;
+      align-items:flex-start;
+      justify-content:center;
+      padding:16px;
+      background:rgba(2,6,23,.35);
+      overflow:auto;
+    }
+    #fichaModal .panel{
+      width:min(var(--panelW), 96vw);
+      margin-top:16px;
+      border-radius:18px;
+      overflow:hidden;
+      background:linear-gradient(#ffffff, #fbfdff);
+      border:1px solid var(--bd);
+      box-shadow:0 22px 70px rgba(0,0,0,.28);
+    }
+    #fichaModal .panelHead{
+      background:linear-gradient(180deg, #244b88, #1b3c6f);
+      color:#fff;
+      padding:12px 14px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .headLeft .k{font-size:12px;opacity:.9;font-weight:900}
+    .headLeft .t{font-size:18px;font-weight:1000;line-height:1.15;margin-top:4px}
+    .headLeft .s{font-size:12px;opacity:.92;margin-top:6px;font-weight:800}
+    .headRight{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+    .headRight .btn{border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff}
+    .headRight .btn.primary{background:#0f172a;border-color:#0f172a}
+    #fichaBody{padding:12px}
+
+    @media (max-width: 1100px){
+      :root{ --panelW: 940px; }
+    }
+
+    /* ===== TABLAS ===== */
+    .tableWrap{
+      overflow:auto;
+      border:1px solid var(--bd);
+      border-radius:14px;
+      background:#fff;
+    }
+    .tableWrap table{
+      border-collapse:collapse;
+      min-width:900px;
+      width:100%;
+      color:#0f172a !important;
+    }
+    .tableWrap thead th{
+      position:sticky;
+      top:0;
+      background:#f8fafc;
+      color:#0f172a !important;
+      font-weight:900;
+      font-size:12px;
+      padding:10px 10px;
+      border-bottom:1px solid var(--bd);
+      z-index:2;
+      text-align:left;
+      white-space:nowrap;
+    }
+    .tableWrap tbody td{
+      color:#0f172a !important;
+      font-size:12px;
+      padding:10px 10px;
+      border-bottom:1px solid #eef2f7;
+      vertical-align:top;
+    }
+    .tableWrap tbody tr:hover td{ background:#f9fafb; }
+  </style>
+</head>
+
+<body class="drawer-mode">
+  <div id="topbar">
+    <div class="brand">
+      <button class="btn" id="toggleSide" title="Menú">☰</button>
+      <strong>Mapa Prolima</strong>
+      <span class="badge" id="count">Cargando...</span>
+    </div>
+
+    <label>Estado:</label>
+    <select class="ctrl" id="estado">
+      <option value="ALL">Todos</option>
+    </select>
+
+    <label>Año(s):</label>
+    <div class="multi" id="anioBox" title="Filtrar por uno o varios años">
+      <div class="multiChips" id="anioChips"></div>
+      <div class="multiActions">
+        <button class="mini" id="btnAllYears" type="button">Todos</button>
+        <button class="mini" id="btnNoYears" type="button">Ninguno</button>
+      </div>
+      <select id="anio" multiple aria-label="Años" style="position:absolute;left:-9999px;top:-9999px"></select>
+    </div>
+
+    <label>Buscar:</label>
+    <input class="ctrl" id="q" placeholder="Código, calle, numeración, responsable, incidente..." />
+
+    <label>Código:</label>
+    <input class="ctrl" id="codeJump" placeholder="Ej: ICL-0345" style="min-width:160px" />
+    <button class="btn" id="btnGoCode">Ir</button>
+    <button class="btn soft" id="btnFutureByCode" title="Marcar estado como FUTURO PROYECTO">Futuro</button>
+
+    <!-- ✅ CAMBIO: Magenta oculto por defecto -->
+    <label class="chk" title="Ocultar lotes SIN ficha (magenta)">
+      <input type="checkbox" id="chkHideMagenta" checked />
+      <span class="dot" style="background:#d946ef"></span>
+      Magenta
+    </label>
+
+    <label class="chk" title="Mostrar recuadros (cuando no hay polígono)">
+      <input type="checkbox" id="chkSquares" checked />
+      <span class="dot" style="background:#ef4444"></span>
+      Recuadros
+    </label>
+
+    <button class="btn warn" id="btnDraw" title="Dibujar lote y guardarlo (GEOM_MANUAL)">✏️ Dibujar</button>
+
+    <button class="btn" id="btnClear">Limpiar</button>
+  </div>
+
+  <div id="backdrop"></div>
+
+  <div id="wrap">
+    <aside id="side">
+      <div class="card">
+        <h3>Dashboard</h3>
+        <div class="muted">Visibles: <b id="visCount">0</b></div>
+        <div class="muted" style="margin-top:6px">
+          <b id="visBreak">—</b>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn primary" id="btnMyLoc">📍 Mi ubicación</button>
+          <button class="btn" id="btnReload">🔄 Recargar</button>
+        </div>
+        <div class="muted" style="margin-top:8px" id="apiStatus"></div>
+
+        <div class="muted" style="margin-top:6px">
+          *Click en un lote para abrir la <b>Ficha</b> (modal). La URL quedará como <b>#/inmueble/ICL-0345</b>.
+        </div>
+
+        <div class="muted" style="margin-top:10px">
+          <b>Pendientes (solo acciones):</b>
+          <span id="pendCount">—</span>
+          <div id="pendList" style="margin-top:8px;max-height:120px;overflow:auto"></div>
+        </div>
+
+        <div class="muted" style="margin-top:10px">
+          <b>Manual (dibujado):</b>
+          <span id="manualCount">—</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Lista (visibles)</h3>
+        <div class="muted" style="margin-bottom:10px">Toca un item para ir al lote y abrir ficha.</div>
+        <div class="list" id="list"></div>
+      </div>
+    </aside>
+
+    <main style="position:relative">
+      <div id="map"></div>
+    </main>
+  </div>
+
+  <!-- FICHA MODAL -->
+  <div id="fichaModal" role="dialog" aria-modal="true" aria-label="Ficha del inmueble">
+    <div class="panel" role="document">
+      <div class="panelHead">
+        <div class="headLeft">
+          <div class="k" id="fmK">Ficha del inmueble</div>
+          <div class="t" id="fmT">Cargando...</div>
+          <div class="s" id="fmS"></div>
+          <div id="fmChips" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+        </div>
+        <div class="headRight">
+          <button class="btn" id="btnCopyLink">🔗 Copiar link</button>
+          <button class="btn primary" id="btnCloseFicha">✖ Cerrar</button>
+        </div>
+      </div>
+      <div id="fichaBody">
+        <div class="muted">Consultando a Google Sheets...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox" role="dialog" aria-modal="true" aria-label="Vista de imagen">
+    <div class="box">
+      <div class="top">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div class="ttl" id="lbTitle">Imagen</div>
+          <span class="lbHint">Rueda = zoom · Arrastra = mover</span>
+        </div>
+        <div class="actions">
+          <button id="lbZoomOut" title="Alejar">−</button>
+          <button id="lbZoomReset" title="Reset">Reset</button>
+          <button id="lbZoomIn" title="Acercar">+</button>
+          <a id="lbDrive" href="#" target="_blank" rel="noopener">Abrir en Drive</a>
+          <button id="lbClose">Cerrar</button>
+        </div>
+      </div>
+      <div class="stage" id="lbStage">
+        <img id="lbImg" src="" alt="Imagen" />
+      </div>
+    </div>
+  </div>
+
+  <iframe name="save_iframe" style="display:none"></iframe>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxz9ujQp8p9gnt4tkeElOf_6nOEVwcAAKulVkDzswxkwLPfPZ2MYgjctEaHH8oPCg4/exec";
+
+    const GEOJSON_SOURCES = [
+      { name: "Manual",            url: "__manual__",                 enabled: true,  showAll: true  },
+      { name: "Monumentos",        url: "./monumentos.geojson",       enabled: true,  showAll: true  },
+      { name: "Valor Monumental",  url: "./valormonumental.geojson",  enabled: true,  showAll: true  },
+      { name: "UNESCO",            url: "./unesco.geojson",           enabled: false, showAll: true  }
+    ];
+
+    const map = L.map('map', { zoomControl: true }).setView([-12.0464, -77.0428], 13);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(map);
+
+    let myMarker = null;
+
+    const colorPorEstado = {
+      "CONCLUIDO": "#2563eb",
+      "CONCLUIDA": "#2563eb",
+      "ACTIVO": "#16a34a",
+      "EN PROCESO": "#16a34a",
+      "EN PR...": "#16a34a",
+      "PAUSADO": "#f59e0b",
+      "PENDIENTE": "#f59e0b",
+      "SUSPENDIDO": "#f59e0b",
+      "PARA...": "#f59e0b",
+      "OBSERVADO": "#ef4444",
+      "EMERGENCIA": "#ef4444",
+      "EMER...": "#ef4444",
+      "RIESGO": "#ef4444",
+      "EN RIESGO": "#ef4444",
+      "FUTURO PROYECTO": "#8b5cf6"
+    };
+
+    const COLOR_SIN_FICHA   = "#d946ef";
+    const COLOR_UNESCO      = "#ef4444";
+    const COLOR_UNESCO_FILL = "#ef4444";
+
+    function norm(s){ return String(s||"").trim().toUpperCase(); }
+    function esc(s){
+      return String(s ?? "").replace(/[&<>"']/g, m => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[m]));
+    }
+
+    function getCodigo(obj){
+      if(!obj) return "";
+      return String(obj.codigo || obj.f || obj.CODIGO || obj.F || obj.id || obj.ID || "").trim();
+    }
+
+    function fmtDate(val){
+      if(val === null || val === undefined) return "";
+      const s = String(val).trim();
+      if(!s) return "";
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+      const d = new Date(s);
+      if(!isNaN(d.getTime())){
+        const dd = String(d.getDate()).padStart(2,"0");
+        const mm = String(d.getMonth()+1).padStart(2,"0");
+        const yy = d.getFullYear();
+        return `${dd}/${mm}/${yy}`;
+      }
+      return s;
+    }
+
+    function getDriveFileId(url){
+      url = String(url||"").trim();
+      if(!url) return "";
+      let m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if(m && m[1]) return m[1];
+      m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if(m && m[1]) return m[1];
+      m = url.match(/uc\?export=view&id=([a-zA-Z0-9_-]+)/);
+      if(m && m[1]) return m[1];
+      m = url.match(/thumbnail\?id=([a-zA-Z0-9_-]+)/);
+      if(m && m[1]) return m[1];
+      return "";
+    }
+    function toDriveThumb(url){
+      const id = getDriveFileId(url);
+      if(id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1200`;
+      return String(url||"").trim();
+    }
+    function toDriveOpen(url){
+      const id = getDriveFileId(url);
+      if(id) return `https://drive.google.com/file/d/${id}/view`;
+      return String(url||"").trim();
+    }
+    function isUrl(v){ return /^https?:\/\/\S+/i.test(String(v||"").trim()); }
+
+    function valToHTML(v){
+      const t = String(v ?? "").trim();
+      if(!t) return "";
+      if(isUrl(t)){
+        const open = toDriveOpen(t);
+        return `<a href="${esc(open)}" target="_blank" rel="noopener">Abrir</a>`;
+      }
+      if(/\d{4}-\d{2}-\d{2}/.test(t) || /GMT/.test(t)){
+        return esc(fmtDate(t));
+      }
+      return esc(t);
+    }
+
+    // ===== Lightbox + zoom =====
+    const lb = document.getElementById("lightbox");
+    const lbImg = document.getElementById("lbImg");
+    const lbTitle = document.getElementById("lbTitle");
+    const lbDrive = document.getElementById("lbDrive");
+    const lbClose = document.getElementById("lbClose");
+    const lbStage = document.getElementById("lbStage");
+    const lbZoomIn = document.getElementById("lbZoomIn");
+    const lbZoomOut = document.getElementById("lbZoomOut");
+    const lbZoomReset = document.getElementById("lbZoomReset");
+
+    let lbScale = 1;
+    let lbTx = 0;
+    let lbTy = 0;
+    let dragging = false;
+    let dragStart = null;
+
+    function applyLbTransform(){
+      lbImg.style.transform = `translate(calc(-50% + ${lbTx}px), calc(-50% + ${lbTy}px)) scale(${lbScale})`;
+    }
+    function resetLb(){
+      lbScale = 1; lbTx = 0; lbTy = 0;
+      applyLbTransform();
+    }
+
+    function openLightbox(imgUrl, driveUrl, title){
+      lbTitle.textContent = title || "Imagen";
+      lbDrive.href = driveUrl || "#";
+      lbImg.src = imgUrl || "";
+      lb.style.display = "flex";
+      resetLb();
+    }
+    function closeLightbox(){
+      lb.style.display = "none";
+      lbImg.src = "";
+      lbDrive.href = "#";
+      resetLb();
+    }
+    lb.addEventListener("click", (e) => { if(e.target === lb) closeLightbox(); });
+    lbClose.addEventListener("click", closeLightbox);
+
+    lbZoomIn.addEventListener("click", () => { lbScale = Math.min(6, lbScale * 1.2); applyLbTransform(); });
+    lbZoomOut.addEventListener("click", () => { lbScale = Math.max(1, lbScale / 1.2); applyLbTransform(); });
+    lbZoomReset.addEventListener("click", resetLb);
+
+    lbStage.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const dir = Math.sign(e.deltaY);
+      const factor = dir > 0 ? 1/1.12 : 1.12;
+      lbScale = Math.min(6, Math.max(1, lbScale * factor));
+      applyLbTransform();
+    }, { passive:false });
+
+    function pointerDown(e){
+      dragging = true;
+      const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      dragStart = { x:p.clientX, y:p.clientY, tx:lbTx, ty:lbTy };
+    }
+    function pointerMove(e){
+      if(!dragging || !dragStart) return;
+      const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      lbTx = dragStart.tx + (p.clientX - dragStart.x);
+      lbTy = dragStart.ty + (p.clientY - dragStart.y);
+      applyLbTransform();
+    }
+    function pointerUp(){ dragging = false; dragStart = null; }
+
+    lbStage.addEventListener("mousedown", pointerDown);
+    window.addEventListener("mousemove", pointerMove);
+    window.addEventListener("mouseup", pointerUp);
+    lbStage.addEventListener("touchstart", pointerDown, { passive:true });
+    lbStage.addEventListener("touchmove", pointerMove, { passive:true });
+    lbStage.addEventListener("touchend", pointerUp);
+
+    // ===== JSONP =====
+    function jsonp(url){
+      return new Promise((resolve, reject) => {
+        const cb = "__cb" + Math.random().toString(36).slice(2);
+        const s = document.createElement("script");
+        const timer = setTimeout(() => { cleanup(); reject(new Error("Timeout JSONP")); }, 60000);
+
+        function cleanup(){
+          clearTimeout(timer);
+          try{ delete window[cb]; }catch(e){ window[cb] = undefined; }
+          if(s.parentNode) s.parentNode.removeChild(s);
+        }
+
+        window[cb] = (data) => { cleanup(); resolve(data); };
+        s.src = url + (url.includes("?") ? "&" : "?") + "callback=" + encodeURIComponent(cb);
+        s.onerror = () => { cleanup(); reject(new Error("Error JSONP")); };
+        document.head.appendChild(s);
+      });
+    }
+
+    // ===== DATA =====
+    let DATA = [];
+    let YEARS = [];
+    let PEND = { total:0, codigos:[] };
+    let ESTADOS_LIST = [];
+    let INCIDENTES_LIST = [];
+
+    async function loadData(){
+      const apiStatus = document.getElementById("apiStatus");
+      apiStatus.textContent = "Conectando con Google Sheets...";
+
+      const res = await jsonp(SCRIPT_URL + "?action=getPuntos");
+      if(!res || !res.ok) throw new Error(res && res.error ? res.error : "Respuesta inválida");
+      DATA = Array.isArray(res.data) ? res.data : [];
+
+      fillEstados();
+      fillIncidentes();
+      fillYears();
+
+      try{
+        const p = await jsonp(SCRIPT_URL + "?action=getPendientesAcciones");
+        if(p && p.ok){
+          PEND = { total: Number(p.total||0), codigos: Array.isArray(p.codigos)?p.codigos:[] };
+        }
+      }catch(_){
+        PEND = { total:0, codigos:[] };
+      }
+
+      renderPendientes();
+      apiStatus.textContent = "✅ Conectado";
+    }
+
+    function fillEstados(){
+      const sel = document.getElementById("estado");
+
+      const fromData = Array.from(new Set(DATA.map(x => norm(x.estado)).filter(Boolean)));
+      const always = ["FUTURO PROYECTO"];
+
+      ESTADOS_LIST = Array.from(new Set([...fromData, ...always])).sort((a,b)=>a.localeCompare(b,"es"));
+
+      sel.innerHTML =
+        `<option value="ALL">Todos</option>` +
+        ESTADOS_LIST.map(e => `<option value="${e}">${e}</option>`).join("");
+    }
+
+    function fillIncidentes(){
+      const fromData = Array.from(new Set(
+        DATA.map(x => norm(x.tipoIncidente)).filter(Boolean)
+      ));
+      const always = ["INCENDIO","DERRUMBE","COLAPSO","INUNDACIÓN","RIESGO ELÉCTRICO","OTRO"];
+      INCIDENTES_LIST = Array.from(new Set([...always, ...fromData]))
+        .filter(Boolean)
+        .sort((a,b)=>a.localeCompare(b,"es"));
+    }
+
+    function fillYears(){
+      const sel = document.getElementById("anio");
+      const chips = document.getElementById("anioChips");
+
+      YEARS = Array.from(new Set(
+        DATA.map(x => String(x.anio || "").trim()).filter(Boolean)
+      )).sort();
+
+      sel.innerHTML = YEARS.map(y => `<option value="${esc(y)}">${esc(y)}</option>`).join("");
+
+      chips.innerHTML = "";
+      if(!YEARS.length){
+        chips.innerHTML = `<span class="muted">Sin años</span>`;
+        return;
+      }
+
+      YEARS.forEach(y => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "chipBtn";
+        b.dataset.value = y;
+        b.innerHTML = `${esc(y)} <span class="x">×</span>`;
+        b.addEventListener("click", () => toggleYear(y));
+        chips.appendChild(b);
+      });
+
+      syncYearChips();
+    }
+
+    function getSelectedYears(){
+      const sel = document.getElementById("anio");
+      return Array.from(sel.selectedOptions).map(o => o.value);
+    }
+    function setSelectedYears(values){
+      const sel = document.getElementById("anio");
+      const set = new Set(values);
+      Array.from(sel.options).forEach(o => o.selected = set.has(o.value));
+      syncYearChips();
+    }
+    function toggleYear(y){
+      const sel = document.getElementById("anio");
+      const opt = Array.from(sel.options).find(o => o.value === y);
+      if(opt) opt.selected = !opt.selected;
+      syncYearChips();
+      renderAll();
+    }
+    function syncYearChips(){
+      const selected = new Set(getSelectedYears());
+      document.querySelectorAll("#anioChips .chipBtn").forEach(b => {
+        b.classList.toggle("active", selected.has(b.dataset.value));
+      });
+    }
+
+    function hideMagentaEnabled(){ return !!document.getElementById("chkHideMagenta").checked; }
+    function squaresEnabled(){ return !!document.getElementById("chkSquares").checked; }
+
+    function pointMatchesFilters(p){
+      const estadoSel = document.getElementById("estado").value;
+      const q = document.getElementById("q").value.trim().toLowerCase();
+      const yearsSelArr = getSelectedYears();
+      const yearsSel = new Set(yearsSelArr);
+      const useYears = yearsSel.size > 0;
+
+      const est = norm(p.estado);
+      const okE = (estadoSel === "ALL") || (est === estadoSel);
+
+      const an = String(p.anio || "").trim();
+      const okY = (!useYears) || yearsSel.has(an);
+
+      const hay = (v) => String(v||"").toLowerCase().includes(q);
+      const codigo = getCodigo(p);
+
+      const okQ = !q || (
+        hay(codigo) || hay(p.calle) || hay(p.numeracion) || hay(p.direccion) ||
+        hay(p.categ) || hay(p.respIng) || hay(p.respArq) || hay(p.tipoIncidente) ||
+        hay(p.comentario) ||
+        (Array.isArray(p.allFields) && p.allFields.some(x => hay(x.label) || hay(x.value)))
+      );
+
+      const latOk = (p.lat !== null && p.lat !== undefined && !isNaN(Number(p.lat)));
+      const lngOk = (p.lng !== null && p.lng !== undefined && !isNaN(Number(p.lng)));
+      const ubicado = (p.ubicado === true) || (String(p.ubicado||"").toLowerCase() === "true") || (String(p.ubicado||"").trim() === "1") || (latOk && lngOk);
+
+      return okE && okY && okQ && ubicado;
+    }
+
+    // ===== Multi GeoJSON =====
+    const overlayLayers = {};
+    const geojsonData = {};
+    let groupAll = L.featureGroup().addTo(map);
+
+    async function fetchGeoJSON(url){
+      const r = await fetch(url, { cache: "no-store" });
+      if(!r.ok) throw new Error(`No se pudo cargar ${url} (${r.status})`);
+      return await r.json();
+    }
+
+    function prioEstado(estadoNorm){
+      if(["OBSERVADO","EMERGENCIA","EMER...","RIESGO","EN RIESGO"].includes(estadoNorm)) return 4;
+      if(["PAUSADO","PENDIENTE","SUSPENDIDO","PARA..."].includes(estadoNorm)) return 3;
+      if(["ACTIVO","EN PROCESO","EN PR..."].includes(estadoNorm)) return 2;
+      if(["CONCLUIDO","CONCLUIDA"].includes(estadoNorm)) return 1;
+      if(["FUTURO PROYECTO"].includes(estadoNorm)) return 0;
+      return 0;
+    }
+
+    function featureColorByItems(items){
+      let best = -1;
+      let bestColor = "#6b7280";
+      for(const it of items){
+        const est = norm(it.estado);
+        const p = prioEstado(est);
+        if(p > best){
+          best = p;
+          bestColor = colorPorEstado[est] || bestColor;
+        }
+      }
+      if(best < 0 && items.length){
+        const est0 = norm(items[0].estado);
+        if(colorPorEstado[est0]) bestColor = colorPorEstado[est0];
+      }
+      return bestColor;
+    }
+
+    function safeFeatureForTurf(feature){
+      try{
+        let f = turf.cleanCoords(feature);
+        f = turf.rewind(f, { reverse:false });
+        return f;
+      }catch(_){
+        return null;
+      }
+    }
+
+    function attachPointsToGeojson(gj){
+      if(!gj || !Array.isArray(gj.features)) return;
+
+      gj.features.forEach(f => {
+        if(!f.properties) f.properties = {};
+        f.properties.__items = [];
+      });
+
+      const points = DATA.filter(p => {
+        const latOk = (p.lat !== null && p.lat !== undefined && !isNaN(Number(p.lat)));
+        const lngOk = (p.lng !== null && p.lng !== undefined && !isNaN(Number(p.lng)));
+        return latOk && lngOk;
+      });
+
+      for(const p of points){
+        const pt = turf.point([Number(p.lng), Number(p.lat)]);
+        for(const f0 of gj.features){
+          const f = safeFeatureForTurf(f0);
+          if(!f) continue;
+
+          try{
+            if(turf.booleanPointInPolygon(pt, f, { ignoreBoundary:false })){
+              f0.properties.__items.push(p);
+              break;
+            }
+          }catch(_){}
+        }
+      }
+    }
+
+    function attachPointsToGeojsonManual(gj){
+      if(!gj || !Array.isArray(gj.features)) return;
+      const byCodigo = new Map();
+      for(const p of DATA){
+        const c = getCodigo(p);
+        if(!c) continue;
+        if(!byCodigo.has(c)) byCodigo.set(c, []);
+        byCodigo.get(c).push(p);
+      }
+      gj.features.forEach(f => {
+        if(!f.properties) f.properties = {};
+        const c = String(f.properties.codigo || f.properties.CODIGO || f.properties.id || "").trim();
+        f.properties.__items = (c && byCodigo.has(c)) ? byCodigo.get(c) : [];
+      });
+    }
+
+    function getAllGeojsonFeatures(){
+      const feats = [];
+      for(const name in geojsonData){
+        const gj = geojsonData[name];
+        if(gj && Array.isArray(gj.features)) feats.push(...gj.features);
+      }
+      return feats;
+    }
+
+    // ===== RECUADROS =====
+    const squaresLayer = L.featureGroup().addTo(map);
+
+    let POLY_CODE_SET = new Set();
+    function buildPolygonCodeSet(){
+      const set = new Set();
+      try{
+        for(const name in geojsonData){
+          const gj = geojsonData[name];
+          if(!gj || !Array.isArray(gj.features)) continue;
+
+          for(const f0 of gj.features){
+            const props = f0.properties || {};
+            const c1 = String(props.codigo || props.CODIGO || props.id || props.ID || "").trim();
+            if(c1) set.add(c1);
+
+            if(Array.isArray(props.__items)){
+              for(const it of props.__items){
+                const c2 = getCodigo(it);
+                if(c2) set.add(c2);
+              }
+            }
+          }
+        }
+      }catch(_){}
+      POLY_CODE_SET = set;
+    }
+    function polygonExistsForPoint(p){
+      const c = getCodigo(p);
+      return !!(c && POLY_CODE_SET && POLY_CODE_SET.has(c));
+    }
+
+    function pointInsideAnyGeojson(p){
+      try{
+        const pt = turf.point([Number(p.lng), Number(p.lat)]);
+        for(const name in geojsonData){
+          const gj = geojsonData[name];
+          if(!gj || !Array.isArray(gj.features)) continue;
+
+          for(const f0 of gj.features){
+            const f = safeFeatureForTurf(f0);
+            if(!f) continue;
+
+            try{
+              if(turf.booleanPointInPolygon(pt, f, { ignoreBoundary:false })) return true;
+            }catch(_){}
+          }
+        }
+      }catch(_){}
+      return false;
+    }
+
+    function makeSquarePolygon(lat, lng, meters=14){
+      const dLat = meters / 111320;
+      const dLng = meters / (111320 * Math.cos(lat * Math.PI/180));
+      const a = [lng - dLng, lat - dLat];
+      const b = [lng + dLng, lat - dLat];
+      const c = [lng + dLng, lat + dLat];
+      const d = [lng - dLng, lat + dLat];
+      return [ [a[1],a[0]], [b[1],b[0]], [c[1],c[0]], [d[1],d[0]] ];
+    }
+
+    function adjustedSquareCenter(lat, lng){
+      try{
+        const pt = turf.point([lng, lat]);
+        let best = null;
+        let bestD = Infinity;
+
+        const feats = getAllGeojsonFeatures();
+        for(const f of feats){
+          try{
+            const c = turf.centroid(f);
+            const d = turf.distance(pt, c, { units:"kilometers" });
+            if(d < bestD){
+              bestD = d;
+              best = f;
+            }
+          }catch(_){}
+        }
+
+        if(!best) return [lat, lng];
+
+        const center = turf.centroid(best);
+        const cx = center.geometry.coordinates[0];
+        const cy = center.geometry.coordinates[1];
+
+        const nlng = lng + (cx - lng) * 0.35;
+        const nlat = lat + (cy - lat) * 0.35;
+        return [nlat, nlng];
+      }catch(_){
+        return [lat, lng];
+      }
+    }
+
+    function squareTooltipHTML(p){
+      const codigo = getCodigo(p);
+      const dir = (p.direccion || [p.calle, p.numeracion].filter(Boolean).join(" ")).trim();
+      const est = (p.estado || "—");
+      const anio = (p.anio || "—");
+      const inc = (p.tipoIncidente || "");
+      return `
+        <div style="font-weight:900">${esc(codigo || "SIN CÓDIGO")}</div>
+        <div style="font-size:12px;color:#334155">${esc(dir || "Sin dirección")}</div>
+        <div style="font-size:12px;margin-top:4px">
+          <b>Estado:</b> ${esc(est)} · <b>Año:</b> ${esc(anio)}
+          ${inc ? ` · <b>Inc:</b> ${esc(inc)}` : ``}
+        </div>
+        <div style="font-size:12px;margin-top:6px;color:#2563eb;font-weight:900">Click para abrir ficha</div>
+      `;
+    }
+
+    function renderUnmappedSquares(){
+      squaresLayer.clearLayers();
+      if(!squaresEnabled()) return;
+
+      const visibles = DATA.filter(pointMatchesFilters);
+      const pts = visibles.filter(p => p.lat!=null && p.lng!=null && !isNaN(Number(p.lat)) && !isNaN(Number(p.lng)));
+
+      let count = 0;
+
+      pts.forEach(p => {
+        if(polygonExistsForPoint(p)) return;
+        if(pointInsideAnyGeojson(p)) return;
+
+        const est = norm(p.estado);
+        const c = colorPorEstado[est] || "#6b7280";
+
+        const lat0 = Number(p.lat);
+        const lng0 = Number(p.lng);
+
+        const [latAdj, lngAdj] = adjustedSquareCenter(lat0, lng0);
+        const sq = makeSquarePolygon(latAdj, lngAdj, 18);
+
+        const poly = L.polygon(sq, {
+          color: c,
+          weight: 3,
+          opacity: 1,
+          fillColor: c,
+          fillOpacity: 0.10
+        });
+
+        poly.bindTooltip(squareTooltipHTML(p), { sticky:true, direction:"top", opacity:0.95 });
+        poly.on("click", () => {
+          const codigo = getCodigo(p);
+          if(codigo) openFichaByCodigo(codigo);
+          else alert("No se encontró código para abrir ficha.");
+        });
+
+        poly.addTo(squaresLayer);
+        count++;
+      });
+
+      squaresLayer.__count = count;
+    }
+
+    // ===== FICHA MODAL (igual que tu versión) =====
+    const fichaModal = document.getElementById("fichaModal");
+    const fichaBody  = document.getElementById("fichaBody");
+    const fmT = document.getElementById("fmT");
+    const fmS = document.getElementById("fmS");
+    const fmChips = document.getElementById("fmChips");
+    const btnCloseFicha = document.getElementById("btnCloseFicha");
+    const btnCopyLink = document.getElementById("btnCopyLink");
+
+    function openModal(){
+      fichaModal.style.display = "flex";
+      closeDrawer();
+    }
+    function closeModal(){
+      fichaModal.style.display = "none";
+      fichaBody.innerHTML = `<div class="muted">—</div>`;
+      fmT.textContent = "";
+      fmS.textContent = "";
+      fmChips.innerHTML = "";
+    }
+    fichaModal.addEventListener("click", (e)=>{ if(e.target === fichaModal) { clearHash(); closeModal(); } });
+    btnCloseFicha.addEventListener("click", ()=>{ clearHash(); closeModal(); });
+
+    btnCopyLink.addEventListener("click", async () => {
+      const link = window.location.href;
+      try{
+        await navigator.clipboard.writeText(link);
+        alert("Link copiado ✅");
+      }catch(e){
+        prompt("Copia el link:", link);
+      }
+    });
+
+    function imgBlock(urlRaw, label){
+      const raw = String(urlRaw||"").trim();
+      if(!raw) return `<div class="muted">Sin foto “${esc(label)}”.</div>`;
+      const thumb = toDriveThumb(raw);
+      const open = toDriveOpen(raw);
+      return `
+        <div class="imgcard">
+          <div class="imgwrap">
+            <img
+              src="${esc(thumb)}"
+              alt="${esc(label)}"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              data-lb-img="${esc(thumb)}"
+              data-lb-drive="${esc(open)}"
+              data-lb-title="${esc(label)}"
+            />
+          </div>
+          <div class="imgfoot">
+            <span class="muted">${esc(label)}</span>
+            <a href="${esc(open)}" target="_blank" rel="noopener">Abrir en Drive</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function allFieldsBlock(arr){
+      const rows = (arr||[])
+        .filter(x => x && String(x.value||"").trim())
+        .map(x => `
+          <div class="kvRow">
+            <div class="kvK">${esc(x.label || "")}</div>
+            <div class="kvV">${valToHTML(x.value)}</div>
+          </div>
+        `).join("");
+      return rows ? `<div class="kv">${rows}</div>` : `<div class="muted">No hay datos para mostrar.</div>`;
+    }
+
+    function renderRelatedTable(title, arr){
+      const a = Array.isArray(arr) ? arr : [];
+      if(!a.length) return `<div class="muted">Sin registros.</div>`;
+
+      const keys = Object.keys(a[0]).filter(k => k !== "_row");
+      const head = keys.map(k => `<th>${esc(k)}</th>`).join("");
+
+      const body = a.map(obj => {
+        const tds = keys.map(k => {
+          const v = obj[k];
+          if(/fecha/i.test(k)){
+            return `<td>${esc(fmtDate(v))}</td>`;
+          }
+          return `<td>${valToHTML(v)}</td>`;
+        }).join("");
+        return `<tr>${tds}</tr>`;
+      }).join("");
+
+      return `
+        <div class="tableWrap" style="margin-top:10px">
+          <table>
+            <thead><tr>${head}</tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function wireFichaLightbox(){
+      fichaBody.querySelectorAll("img[data-lb-img]").forEach(img => {
+        img.addEventListener("click", () => {
+          openLightbox(
+            img.getAttribute("data-lb-img"),
+            img.getAttribute("data-lb-drive"),
+            img.getAttribute("data-lb-title")
+          );
+        });
+      });
+    }
+
+    function setFichaTab(tab){
+      fichaBody.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+      fichaBody.querySelectorAll("[data-panel]").forEach(p => p.style.display = (p.dataset.panel === tab) ? "block" : "none");
+    }
+
+    function setAccionesTab(which){
+      const box = fichaBody.querySelector("[data-panel='acciones']");
+      if(!box) return;
+      box.querySelectorAll(".subtab").forEach(b => b.classList.toggle("active", b.dataset.sub === which));
+      box.querySelectorAll("[data-subpanel]").forEach(p => p.style.display = (p.dataset.subpanel === which) ? "block" : "none");
+    }
+
+    function setHashForFicha(codigo){
+      location.hash = `#/inmueble/${encodeURIComponent(codigo)}`;
+    }
+    function clearHash(){
+      history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
+
+    async function fetchFicha(codigo){
+      const res = await jsonp(SCRIPT_URL + `?action=getFicha&codigo=${encodeURIComponent(codigo)}`);
+      if(!res || !res.ok) throw new Error(res && res.error ? res.error : "No se pudo obtener ficha");
+      return res.data;
+    }
+
+    function wireSaveComentario(rowNumber, initialText){
+      const ta = fichaBody.querySelector(".js-coment");
+      const status = fichaBody.querySelector(".js-status");
+      const btnSave = fichaBody.querySelector(".js-save");
+      if(!ta || !btnSave) return;
+
+      ta.value = String(initialText || "");
+
+      btnSave.addEventListener("click", (e) => {
+        e.preventDefault();
+        const text = ta.value || "";
+        btnSave.disabled = true;
+        status.textContent = "Guardando...";
+
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = SCRIPT_URL;
+        form.target = "save_iframe";
+        form.style.display = "none";
+
+        const f1 = document.createElement("input");
+        f1.name = "action"; f1.value = "saveComentario";
+        const f2 = document.createElement("input");
+        f2.name = "rowNumber"; f2.value = String(rowNumber);
+        const f3 = document.createElement("input");
+        f3.name = "comentario"; f3.value = String(text);
+
+        form.appendChild(f1); form.appendChild(f2); form.appendChild(f3);
+        document.body.appendChild(form);
+        form.submit();
+
+        setTimeout(() => form.remove(), 2000);
+        setTimeout(() => {
+          btnSave.disabled = false;
+          status.textContent = "✅ Guardado";
+          const cod = String(fichaModal.dataset.codigo||"").trim();
+          const p = DATA.find(x => norm(getCodigo(x)) === norm(cod));
+          if(p) p.comentario = String(text).trim();
+        }, 650);
+      });
+    }
+
+    function wireSaveEstado(rowNumber, estadoActual){
+      const sel = fichaBody.querySelector(".js-estadoSel");
+      const status = fichaBody.querySelector(".js-estadoStatus");
+      const btn = fichaBody.querySelector(".js-saveEstado");
+      const btnFuture = fichaBody.querySelector(".js-futureEstado");
+      if(!sel || !btn) return;
+
+      sel.innerHTML = ESTADOS_LIST.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join("");
+      const cur = norm(estadoActual);
+      const opt = Array.from(sel.options).find(o => norm(o.value) === cur);
+      if(opt) opt.selected = true;
+
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const nuevo = sel.value || "";
+        if(!nuevo){
+          status.textContent = "Elige un estado.";
+          return;
+        }
+
+        btn.disabled = true;
+        status.textContent = "Guardando...";
+
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = SCRIPT_URL;
+        form.target = "save_iframe";
+        form.style.display = "none";
+
+        const a = document.createElement("input");
+        a.name = "action"; a.value = "updateEstado";
+
+        const r = document.createElement("input");
+        r.name = "rowNumber"; r.value = String(rowNumber);
+
+        const est = document.createElement("input");
+        est.name = "estado"; est.value = String(nuevo);
+
+        form.appendChild(a); form.appendChild(r); form.appendChild(est);
+        document.body.appendChild(form);
+        form.submit();
+
+        setTimeout(()=>form.remove(), 2000);
+
+        setTimeout(() => {
+          btn.disabled = false;
+          status.textContent = "✅ Estado guardado";
+
+          const cod = String(fichaModal.dataset.codigo||"").trim();
+          const p = DATA.find(x => norm(getCodigo(x)) === norm(cod));
+          if(p) p.estado = String(nuevo);
+
+          renderAll();
+        }, 650);
+      });
+
+      if(btnFuture){
+        btnFuture.addEventListener("click", (e) => {
+          e.preventDefault();
+          sel.value = "FUTURO PROYECTO";
+          btn.click();
+        });
+      }
+    }
+
+    function wireSaveIncidente(rowNumber, incidenteActual){
+      const sel = fichaBody.querySelector(".js-incSel");
+      const inputOtro = fichaBody.querySelector(".js-incOtro");
+      const status = fichaBody.querySelector(".js-incStatus");
+      const btn = fichaBody.querySelector(".js-saveInc");
+      const btnClear = fichaBody.querySelector(".js-clearInc");
+      if(!sel || !btn) return;
+
+      const base = (INCIDENTES_LIST || []).filter(e => norm(e) !== "OTRO");
+      sel.innerHTML =
+        `<option value="">— (vacío)</option>` +
+        base.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join("") +
+        `<option value="OTRO">OTRO</option>`;
+
+      const cur = norm(incidenteActual);
+      const match = Array.from(sel.options).find(o => norm(o.value) === cur);
+
+      if(match){
+        match.selected = true;
+      }else if(incidenteActual){
+        sel.value = "OTRO";
+        inputOtro.style.display = "block";
+        inputOtro.value = incidenteActual;
+      }
+
+      sel.addEventListener("change", () => {
+        if(sel.value === "OTRO"){
+          inputOtro.style.display = "block";
+          inputOtro.focus();
+        }else{
+          inputOtro.style.display = "none";
+          inputOtro.value = "";
+        }
+      });
+
+      function postInc(nuevo){
+        btn.disabled = true;
+        if(btnClear) btnClear.disabled = true;
+        status.textContent = "Guardando...";
+
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = SCRIPT_URL;
+        form.target = "save_iframe";
+        form.style.display = "none";
+
+        const a = document.createElement("input");
+        a.name = "action"; a.value = "updateTipoIncidente";
+
+        const r = document.createElement("input");
+        r.name = "rowNumber"; r.value = String(rowNumber);
+
+        const inc = document.createElement("input");
+        inc.name = "tipoIncidente"; inc.value = String(nuevo || "");
+
+        form.appendChild(a); form.appendChild(r); form.appendChild(inc);
+        document.body.appendChild(form);
+        form.submit();
+
+        setTimeout(()=>form.remove(), 2000);
+
+        setTimeout(() => {
+          btn.disabled = false;
+          if(btnClear) btnClear.disabled = false;
+          status.textContent = "✅ Incidente guardado";
+
+          const cod = String(fichaModal.dataset.codigo||"").trim();
+          const p = DATA.find(x => norm(getCodigo(x)) === norm(cod));
+          if(p) p.tipoIncidente = String(nuevo || "");
+
+          renderAll();
+        }, 650);
+      }
+
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+
+        let valor = sel.value;
+
+        if(valor === "OTRO"){
+          valor = inputOtro.value.trim();
+          if(!valor){
+            status.textContent = "Escribe el incidente.";
+            return;
+          }
+        }
+
+        postInc(valor);
+      });
+
+      if(btnClear){
+        btnClear.addEventListener("click", (e) => {
+          e.preventDefault();
+          sel.value = "";
+          inputOtro.style.display = "none";
+          inputOtro.value = "";
+          postInc("");
+        });
+      }
+    }
+
+    async function openFichaByCodigo(codigo, opts = {}){
+      codigo = String(codigo || "").trim();
+      if(!codigo) return;
+
+      if(!opts.skipHash) setHashForFicha(codigo);
+
+      fichaModal.dataset.codigo = codigo;
+      openModal();
+      fmT.textContent = `Cargando ficha: ${codigo}`;
+      fmS.textContent = "Consultando a Google Sheets...";
+      fmChips.innerHTML = "";
+      fichaBody.innerHTML = `<div class="muted">Cargando...</div>`;
+
+      try{
+        const ficha = await fetchFicha(codigo);
+        renderFichaModal(ficha);
+      }catch(err){
+        fichaBody.innerHTML = `<div class="muted">No se pudo cargar la ficha.</div>`;
+        alert("No se pudo cargar la ficha: " + (err && err.message ? err.message : err));
+      }
+    }
+
+    function pickAccionesArrays(f){
+      const oficina = (Array.isArray(f?.accionesOficina) ? f.accionesOficina : null)
+                   || (Array.isArray(f?.trabajosOficina) ? f.trabajosOficina : [])
+                   || [];
+      const campo   = (Array.isArray(f?.accionesCampo) ? f.accionesCampo : null)
+                   || (Array.isArray(f?.trabajosCampo) ? f.trabajosCampo : [])
+                   || [];
+      return { oficina, campo };
+    }
+
+    function renderFichaModal(f){
+      const codigo = String(f.codigo || getCodigo(f) || "").trim();
+      fichaModal.dataset.codigo = codigo;
+
+      const estN = norm(f.estado);
+      const color = colorPorEstado[estN] || "#6b7280";
+
+      fmT.textContent = `${(codigo ? codigo + " — " : "")}${(f.direccion || "")}`.trim();
+      fmS.textContent = `${f.respIng ? `Resp. Ing: ${f.respIng}` : ""}${(f.respIng && f.respArq) ? " · " : ""}${f.respArq ? `Resp. Arq: ${f.respArq}` : ""}`.trim();
+
+      fmChips.innerHTML = `
+        <span class="chip"><b>Estado:</b>&nbsp;<span style="color:${esc(color)}">${esc(f.estado||"")}</span></span>
+        ${f.categ ? `<span class="chip">🏛️ ${esc(f.categ)}</span>` : ""}
+        ${f.tipoIncidente ? `<span class="chip">🧯 ${esc(f.tipoIncidente)}</span>` : ""}
+        ${f.anio ? `<span class="chip">📅 ${esc(f.anio)}</span>` : ""}
+      `;
+
+      const { oficina: accionesOficina, campo: accionesCampo } = pickAccionesArrays(f);
+
+      fichaBody.innerHTML = `
+        <div class="card" style="box-shadow:none;margin-bottom:12px">
+          <div class="tabs" role="tablist" aria-label="Secciones">
+            <button class="tab" data-tab="prop" type="button">Propietarios</button>
+            <button class="tab" data-tab="fotos" type="button">Fotos</button>
+            <button class="tab" data-tab="todo" type="button">Todo</button>
+            <button class="tab" data-tab="acciones" type="button">Acciones</button>
+            <button class="tab" data-tab="coment" type="button">Comentarios</button>
+            <button class="tab" data-tab="estado" type="button">Estado</button>
+          </div>
+        </div>
+
+        <div data-panel="prop" class="card" style="display:none; box-shadow:none">
+          <h3>Propietarios</h3>
+          ${renderRelatedTable("Propietarios", f.propietarios)}
+        </div>
+
+        <div data-panel="fotos" class="card" style="display:none; box-shadow:none">
+          <h3>Fotos</h3>
+          <div class="muted">Antes / Después (y fotos extra si existe hoja FOTOS)</div>
+          <div class="grid2" style="margin-top:10px">
+            ${imgBlock(f.fotoAntes, "Antes")}
+            ${imgBlock(f.fotoDespues, "Después")}
+          </div>
+
+          <div style="margin-top:12px">
+            <div class="muted"><b>Fotos extra:</b></div>
+            ${Array.isArray(f.fotos) && f.fotos.length ? `
+              <div class="kv">
+                ${f.fotos.map(x => `
+                  <div class="kvRow">
+                    <div class="kvK">${esc(x["tipo"] || x["Tipo"] || x["TIPO"] || "Foto")}</div>
+                    <div class="kvV">${valToHTML(x["url"] || x["URL"] || x["Url"] || x["link"] || x["Link"] || "")}</div>
+                  </div>
+                `).join("")}
+              </div>
+            ` : `<div class="muted">Sin fotos extra.</div>`}
+          </div>
+        </div>
+
+        <div data-panel="todo" class="card" style="display:none; box-shadow:none">
+          <h3>Todo (todas las columnas)</h3>
+          <div class="muted">Aquí se muestra toda la información de la fila.</div>
+          ${allFieldsBlock(f.allFields)}
+        </div>
+
+        <div data-panel="acciones" class="card" style="display:none; box-shadow:none">
+          <h3>Acciones</h3>
+          <div class="muted">Acciones registradas (Oficina / Campo)</div>
+
+          <div class="subtabs" role="tablist" aria-label="Acciones Oficina/Campo">
+            <button class="subtab active" data-sub="oficina" type="button">Acciones Oficina</button>
+            <button class="subtab" data-sub="campo" type="button">Acciones Campo</button>
+          </div>
+
+          <div data-subpanel="oficina" style="margin-top:10px">
+            ${renderRelatedTable("Acciones Oficina", accionesOficina)}
+          </div>
+
+          <div data-subpanel="campo" style="display:none;margin-top:10px">
+            ${renderRelatedTable("Acciones Campo", accionesCampo)}
+          </div>
+        </div>
+
+        <div data-panel="coment" class="card" style="display:none; box-shadow:none">
+          <h3>Comentarios</h3>
+          <div class="muted">Escribe un comentario y guarda (se escribe en la hoja principal).</div>
+          <textarea class="textarea js-coment" placeholder="Ej: Falta coordinación con..."></textarea>
+          <div class="rowActions">
+            <button class="btn primary js-save">💾 Guardar</button>
+            <span class="muted js-status"></span>
+          </div>
+        </div>
+
+        <div data-panel="estado" class="card" style="display:none; box-shadow:none">
+          <h3>Estado (editable)</h3>
+          <div class="muted">Cambia el estado y/o el tipo de incidente y guarda (se escribe en la hoja principal).</div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px">
+            <select class="ctrl js-estadoSel" style="min-width:220px"></select>
+            <button class="btn primary js-saveEstado">💾 Guardar estado</button>
+            <button class="btn soft js-futureEstado">⭐ Futuro proyecto</button>
+            <span class="muted js-estadoStatus"></span>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px">
+            <select class="ctrl js-incSel" style="min-width:220px"></select>
+
+            <input 
+              type="text"
+              class="ctrl js-incOtro"
+              placeholder="Escribe el incidente..."
+              style="min-width:220px; display:none"
+            />
+
+            <button class="btn primary js-saveInc">💾 Guardar incidente</button>
+            <button class="btn soft js-clearInc" title="Dejar vacío">🧹 Limpiar</button>
+            <span class="muted js-incStatus"></span>
+          </div>
+        </div>
+      `;
+
+      fichaBody.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => setFichaTab(b.dataset.tab)));
+
+      const accionesPanel = fichaBody.querySelector("[data-panel='acciones']");
+      if(accionesPanel){
+        accionesPanel.querySelectorAll(".subtab").forEach(b => b.addEventListener("click", () => setAccionesTab(b.dataset.sub)));
+        setAccionesTab("oficina");
+      }
+
+      wireFichaLightbox();
+      wireSaveComentario(f._row, f.comentario || "");
+      wireSaveEstado(f._row, f.estado || "");
+      wireSaveIncidente(f._row, f.tipoIncidente || "");
+      setFichaTab("acciones");
+      openModal();
+    }
+
+    function syncRoute(){
+      const h = location.hash || "";
+      const m = h.match(/^#\/inmueble\/(.+)$/);
+      if(!m){ closeModal(); return; }
+      const codigo = decodeURIComponent(m[1] || "").trim();
+      if(!codigo){ closeModal(); return; }
+      openFichaByCodigo(codigo, { skipHash:true });
+    }
+    window.addEventListener("hashchange", syncRoute);
+
+    // ===== Render GeoJSON =====
+    function renderAllGeojson(){
+      groupAll.clearLayers();
+      for(const k in overlayLayers){
+        if(map.hasLayer(overlayLayers[k])) map.removeLayer(overlayLayers[k]);
+      }
+      for(const k in overlayLayers) delete overlayLayers[k];
+
+      const hideMagenta = hideMagentaEnabled();
+
+      GEOJSON_SOURCES.forEach(src => {
+        const gj = geojsonData[src.name];
+        if(!gj) return;
+
+        const lyr = L.geoJSON(gj, {
+          filter: () => true,
+          style: (feature) => {
+            const itemsAll = (feature.properties && Array.isArray(feature.properties.__items)) ? feature.properties.__items : [];
+            const items = itemsAll.filter(pointMatchesFilters);
+
+            if (src.name === "UNESCO") {
+              if (items.length === 0) {
+                return { color: COLOR_UNESCO, weight: 3, opacity: 1, fillColor: COLOR_UNESCO_FILL, fillOpacity: 0.03, dashArray: "6 6" };
+              }
+              return { color: COLOR_UNESCO, weight: 4, opacity: 1, fillColor: COLOR_UNESCO_FILL, fillOpacity: 0.08 };
+            }
+
+            // ✅ CAMBIO CLAVE:
+            // Si el polígono tiene fichas (itemsAll>0) pero NO pasa filtros (por ejemplo, año != 2026),
+            // lo ocultamos en vez de pintarlo magenta.
+            if (items.length === 0) {
+              if(itemsAll.length > 0){
+                return { opacity:0, fillOpacity:0, weight:0 };
+              }
+              // Solo si realmente no tiene fichas nunca, recién aplica magenta (o se oculta si hideMagenta)
+              if(hideMagenta) return { opacity:0, fillOpacity:0, weight:0 };
+              return { color: COLOR_SIN_FICHA, weight: 2, opacity: 0.95, fillColor: COLOR_SIN_FICHA, fillOpacity: 0.05, dashArray: "4 6" };
+            }
+
+            const c = featureColorByItems(items);
+            const w = (src.name === "Manual") ? 4 : 3;
+            const fo = (src.name === "Manual") ? 0.12 : 0.08;
+            return { color: c, weight: w, opacity: 1, fillColor: c, fillOpacity: fo };
+          },
+          onEachFeature: (feature, layer) => {
+            layer.on("click", (e) => {
+              const itemsAll = (feature.properties && Array.isArray(feature.properties.__items)) ? feature.properties.__items : [];
+              const items = itemsAll.filter(pointMatchesFilters);
+
+              if(!items.length){
+                alert("Este lote no tiene ficha asociada (según filtros).");
+                return;
+              }
+              const first = items[0];
+              const codigo = getCodigo(first);
+
+              if(codigo) openFichaByCodigo(codigo);
+              else alert("No se encontró el código para abrir la ficha.");
+
+              try{ map.panTo(e.latlng); }catch(_){}
+            });
+
+            const itemsAll = (feature.properties && Array.isArray(feature.properties.__items)) ? feature.properties.__items : [];
+            const items = itemsAll.filter(pointMatchesFilters);
+            if(items.length){
+              const first = items[0];
+              const codigo = getCodigo(first);
+              const ttl = `${codigo ? codigo+" — " : ""}${(first.direccion||"")}`.trim();
+              const sub = `${first.estado||"—"}${first.tipoIncidente ? " · " + first.tipoIncidente : ""}`;
+              layer.bindTooltip(`<b>${esc(ttl)}</b><br><span>${esc(sub)}</span>`, { sticky:true, opacity:0.95 });
+            }
+          }
+        });
+
+        overlayLayers[src.name] = lyr;
+        if(src.enabled) lyr.addTo(groupAll);
+      });
+
+      if(window.__layerControl){
+        map.removeControl(window.__layerControl);
+      }
+      window.__layerControl = L.control.layers(null, overlayLayers, { collapsed: true }).addTo(map);
+    }
+
+    function visiblePoints(){
+      return DATA.filter(pointMatchesFilters);
+    }
+
+    function renderCountersAndListFromPoints(){
+      const pts = visiblePoints();
+      const totalFichas = pts.length;
+
+      const polyCount = (() => {
+        try{
+          let n = 0;
+          groupAll.eachLayer(() => { n++; });
+          return n;
+        }catch(_){ return 0; }
+      })();
+
+      const sqCount = squaresLayer.__count || 0;
+
+      document.getElementById("count").textContent = `${totalFichas} ficha(s) · ${polyCount} polígono(s) · ${sqCount} recuadro(s)`;
+      document.getElementById("visCount").textContent = String(totalFichas);
+      document.getElementById("visBreak").textContent = `${totalFichas} ficha(s) · ${polyCount} polígono(s) · ${sqCount} recuadro(s)`;
+      document.getElementById("manualCount").textContent = (geojsonData["Manual"]?.features?.length ?? 0) + " lote(s)";
+
+      renderListFromPoints(pts);
+    }
+
+    function renderListFromPoints(points){
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+
+      if(!points.length){
+        list.innerHTML = `<div class="muted">No hay fichas visibles según filtros.</div>`;
+        return;
+      }
+
+      points.slice(0, 260).forEach(p => {
+        const el = document.createElement("div");
+        el.className = "item";
+
+        const codigo = getCodigo(p);
+        const ttl = `${(codigo ? codigo+" - " : "")}${(p.direccion||"")}`.trim();
+        const sub = `${p.categ || ""}${p.tipoIncidente ? " · " + p.tipoIncidente : ""}`.trim();
+        const pill = p.estado || "—";
+
+        el.innerHTML = `
+          <div class="t">${esc(ttl)}</div>
+          <div class="s">${esc(sub)}</div>
+          <div class="pill">${esc(pill)}</div>
+        `;
+
+        el.addEventListener("click", () => {
+          const lat = Number(p.lat), lng = Number(p.lng);
+          if(!isNaN(lat) && !isNaN(lng)){
+            map.setView([lat,lng], 18, { animate:true });
+          }
+          if(codigo) openFichaByCodigo(codigo);
+          closeDrawer();
+        });
+
+        list.appendChild(el);
+      });
+    }
+
+    function fitToVisible(){
+      const boundsList = [];
+      try{
+        const b1 = groupAll.getBounds();
+        if(b1 && b1.isValid()) boundsList.push(b1);
+      }catch(_){}
+      try{
+        const b2 = squaresLayer.getBounds();
+        if(b2 && b2.isValid()) boundsList.push(b2);
+      }catch(_){}
+      if(!boundsList.length) return;
+      let b = boundsList[0];
+      for(let i=1;i<boundsList.length;i++) b = b.extend(boundsList[i]);
+      map.fitBounds(b, { padding:[20,20] });
+    }
+
+    function renderAll(){
+      renderAllGeojson();
+      buildPolygonCodeSet();
+      renderUnmappedSquares();
+      renderCountersAndListFromPoints();
+      fitToVisible();
+    }
+
+    // ===== Pendientes =====
+    function renderPendientes(){
+      const box = document.getElementById("pendList");
+      const count = document.getElementById("pendCount");
+      const n = Number(PEND.total||0);
+      count.textContent = n ? `✅ Hay ${n} código(s)` : "✅ 0";
+
+      if(!n){
+        box.innerHTML = `<div class="muted">No hay pendientes.</div>`;
+        return;
+      }
+
+      const chips = (PEND.codigos||[]).slice(0,120).map(c => `
+        <button class="chipBtn" type="button" style="height:28px" data-cod="${esc(c)}">${esc(c)}</button>
+      `).join("");
+      box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${chips}</div>`;
+
+      box.querySelectorAll("button[data-cod]").forEach(b => {
+        b.addEventListener("click", () => {
+          const cod = b.getAttribute("data-cod");
+          alert(`Código ${cod} tiene acciones en ACCIONES pero NO existe en Registro General.\n\nPara verlo en el mapa, agrega ese código al Registro General (con lat/lng).`);
+        });
+      });
+    }
+
+    // ===== Drawer =====
+    const backdrop = document.getElementById("backdrop");
+    function closeDrawer(){ document.body.classList.remove("drawer-open"); }
+    function toggleDrawer(){ document.body.classList.toggle("drawer-open"); }
+
+    document.getElementById("toggleSide").addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      toggleDrawer();
+      setTimeout(() => map.invalidateSize(), 220);
+    });
+    backdrop.addEventListener("click", closeDrawer);
+
+    // ===== UI =====
+    document.getElementById("estado").addEventListener("change", renderAll);
+    document.getElementById("q").addEventListener("input", () => {
+      clearTimeout(window.__t);
+      window.__t = setTimeout(renderAll, 150);
+    });
+
+    document.getElementById("btnClear").addEventListener("click", () => {
+      document.getElementById("estado").value = "ALL";
+      document.getElementById("q").value = "";
+      document.getElementById("chkHideMagenta").checked = true;   // ✅ por defecto oculto
+      document.getElementById("chkSquares").checked = true;
+
+      if(YEARS.includes("2026")) setSelectedYears(["2026"]);
+      else setSelectedYears([]);
+      renderAll();
+    });
+
+    document.getElementById("btnReload").addEventListener("click", async () => start(true));
+
+    document.getElementById("btnAllYears").addEventListener("click", () => {
+      setSelectedYears(YEARS);
+      renderAll();
+    });
+    document.getElementById("btnNoYears").addEventListener("click", () => {
+      setSelectedYears([]);
+      renderAll();
+    });
+
+    document.getElementById("chkHideMagenta").addEventListener("change", renderAll);
+    document.getElementById("chkSquares").addEventListener("change", renderAll);
+
+    document.getElementById("btnMyLoc").addEventListener("click", () => {
+      if(!navigator.geolocation){
+        alert("Tu navegador no soporta ubicación.");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        if(myMarker) map.removeLayer(myMarker);
+        myMarker = L.marker([lat,lng]).addTo(map).bindPopup("📍 Estás aquí").openPopup();
+        map.setView([lat,lng], 16, {animate:true});
+        closeDrawer();
+      }, err => {
+        alert("No se pudo obtener ubicación: " + err.message);
+      }, { enableHighAccuracy:true, timeout:10000 });
+    });
+
+    // =========================
+    // Buscar por código + Marcar Futuro
+    // =========================
+    function findPointByCodigo(cod){
+      const c = norm(cod);
+      if(!c) return null;
+      return DATA.find(p => norm(getCodigo(p)) === c) || null;
+    }
+
+    function centerToPoint(p){
+      const lat = Number(p.lat), lng = Number(p.lng);
+      if(!isNaN(lat) && !isNaN(lng)){
+        map.setView([lat, lng], 18, { animate:true });
+      }
+    }
+
+    async function updateEstadoByCodigo(codigo, nuevoEstado){
+      const p = findPointByCodigo(codigo);
+      if(!p){
+        alert("Ese código no existe en Registro General (no está en DATA).");
+        return false;
+      }
+      if(!p._row){
+        alert("No se encontró _row para actualizar en Sheets.");
+        return false;
+      }
+
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = SCRIPT_URL;
+      form.target = "save_iframe";
+      form.style.display = "none";
+
+      const a = document.createElement("input");
+      a.name = "action"; a.value = "updateEstado";
+
+      const r = document.createElement("input");
+      r.name = "rowNumber"; r.value = String(p._row);
+
+      const e = document.createElement("input");
+      e.name = "estado"; e.value = String(nuevoEstado);
+
+      form.appendChild(a); form.appendChild(r); form.appendChild(e);
+      document.body.appendChild(form);
+      form.submit();
+
+      setTimeout(()=>form.remove(), 2000);
+
+      p.estado = String(nuevoEstado);
+      renderAll();
+      return true;
+    }
+
+    document.getElementById("btnGoCode").addEventListener("click", () => {
+      const cod = document.getElementById("codeJump").value.trim();
+      const p = findPointByCodigo(cod);
+      if(!p){
+        alert("No se encontró ese código en Registro General.");
+        return;
+      }
+      centerToPoint(p);
+      const c = getCodigo(p);
+      if(c) openFichaByCodigo(c);
+    });
+
+    document.getElementById("btnFutureByCode").addEventListener("click", async () => {
+      const cod = document.getElementById("codeJump").value.trim();
+      if(!cod){
+        alert("Escribe un código.");
+        return;
+      }
+      const ok = await updateEstadoByCodigo(cod, "FUTURO PROYECTO");
+      if(ok){
+        const p = findPointByCodigo(cod);
+        if(p){
+          centerToPoint(p);
+          const c = getCodigo(p);
+          if(c) openFichaByCodigo(c);
+        }
+        alert("✅ Marcado como FUTURO PROYECTO");
+      }
+    });
+
+    document.getElementById("codeJump").addEventListener("keydown", (e) => {
+      if(e.key === "Enter") document.getElementById("btnGoCode").click();
+    });
+
+    // =========================
+    // DIBUJAR Y GUARDAR EN SHEETS (GEOM_MANUAL)
+    // =========================
+    async function loadManualGeoms(){
+      try{
+        const res = await jsonp(SCRIPT_URL + "?action=listManualGeoms");
+        if(!res || !res.ok) throw new Error(res?.error || "Error cargando manuales");
+        const feats = Array.isArray(res.data) ? res.data : [];
+        return { type:"FeatureCollection", features: feats };
+      }catch(e){
+        return { type:"FeatureCollection", features: [] };
+      }
+    }
+
+    function saveManualGeomPOST(codigo, geojsonObj){
+      return new Promise((resolve, reject) => {
+        try{
+          const form = document.createElement("form");
+          form.method = "POST";
+          form.action = SCRIPT_URL;
+          form.target = "save_iframe";
+          form.style.display = "none";
+
+          const a = document.createElement("input");
+          a.name = "action"; a.value = "saveManualGeom";
+
+          const c = document.createElement("input");
+          c.name = "codigo"; c.value = String(codigo||"").trim();
+
+          const g = document.createElement("input");
+          g.name = "geojson"; g.value = JSON.stringify(geojsonObj);
+
+          form.appendChild(a); form.appendChild(c); form.appendChild(g);
+          document.body.appendChild(form);
+          form.submit();
+
+          setTimeout(() => form.remove(), 2000);
+          setTimeout(() => resolve({ok:true}), 450);
+        }catch(err){
+          reject(err);
+        }
+      });
+    }
+
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    let drawControl = null;
+    let drawEnabled = false;
+
+    function enableDraw(){
+      if(drawEnabled) return;
+      drawEnabled = true;
+      document.getElementById("btnDraw").classList.add("active");
+
+      drawControl = new L.Control.Draw({
+        edit: { featureGroup: drawnItems },
+        draw: {
+          polygon: { allowIntersection:false, showArea:true, shapeOptions:{ weight:3 } },
+          rectangle: { shapeOptions:{ weight:3 } },
+          circle: false,
+          marker: false,
+          polyline: false,
+          circlemarker: false
+        }
+      });
+      map.addControl(drawControl);
+      alert("Modo dibujo activado ✏️\n\nDibuja un polígono o rectángulo. Al terminar te pedirá el CÓDIGO para guardarlo.");
+    }
+
+    function disableDraw(){
+      if(!drawEnabled) return;
+      drawEnabled = false;
+      document.getElementById("btnDraw").classList.remove("active");
+      if(drawControl){
+        map.removeControl(drawControl);
+        drawControl = null;
+      }
+    }
+
+    document.getElementById("btnDraw").addEventListener("click", () => {
+      if(drawEnabled) disableDraw();
+      else enableDraw();
+    });
+
+    map.on(L.Draw.Event.CREATED, async (e) => {
+      const layer = e.layer;
+      drawnItems.addLayer(layer);
+
+      const codigo = prompt("Código del lote (ej: ICL-0345):");
+      const cod = String(codigo||"").trim();
+      if(!cod){
+        drawnItems.removeLayer(layer);
+        return;
+      }
+
+      const geo = layer.toGeoJSON();
+      geo.properties = geo.properties || {};
+      geo.properties.codigo = cod;
+
+      try{
+        await saveManualGeomPOST(cod, geo);
+        alert("Guardado ✅");
+
+        const manual = geojsonData["Manual"];
+        if(manual && Array.isArray(manual.features)){
+          const idx = manual.features.findIndex(f => String(f?.properties?.codigo||"").trim() === cod);
+          if(idx >= 0) manual.features[idx] = geo;
+          else manual.features.push(geo);
+        }else{
+          geojsonData["Manual"] = { type:"FeatureCollection", features:[geo] };
+        }
+
+        attachPointsToGeojsonManual(geojsonData["Manual"]);
+        renderAll();
+
+      }catch(err){
+        alert("No se pudo guardar: " + (err?.message || err));
+      }
+    });
+
+    // ===== START =====
+    async function start(){
+      const apiStatus = document.getElementById("apiStatus");
+      try{
+        apiStatus.textContent = "Cargando datos...";
+        await loadData();
+
+        apiStatus.textContent = "Cargando capas GeoJSON...";
+
+        for(const src of GEOJSON_SOURCES){
+          if(src.url === "__manual__") continue;
+          const gj = await fetchGeoJSON(src.url);
+          geojsonData[src.name] = gj;
+          attachPointsToGeojson(gj);
+        }
+
+        const manualFC = await loadManualGeoms();
+        geojsonData["Manual"] = manualFC;
+        attachPointsToGeojsonManual(manualFC);
+
+        // ✅ inicio SOLO 2026
+        if(YEARS.includes("2026")) setSelectedYears(["2026"]);
+        else setSelectedYears([]);
+
+        renderAll();
+        apiStatus.textContent = "✅ Listo (solo 2026 al iniciar)";
+
+        syncRoute();
+      }catch(err){
+        console.error(err);
+        apiStatus.textContent = "❌ Error: " + (err && err.message ? err.message : err);
+        document.getElementById("count").textContent = "Error";
+        alert("ERROR: " + (err && err.message ? err.message : err) +
+              "\n\nRevisa:\n- SCRIPT_URL correcto\n- Archivos .geojson en la misma carpeta\n- Consola (F12) para ver 404");
+      }
+    }
+
+    start();
+  </script>
+</body>
+</html>
